@@ -91,8 +91,6 @@ library(tesseract)
 library(stringr)
 ```
 
-
-
 ```{r}
 # Cela dépend de la façon dont les compétences sont présentées dans le CV
 competences <- str_extract_all(texte_cv, "data")
@@ -101,6 +99,7 @@ competences <- str_extract_all(texte_cv, "data")
 print(competences)
 
 ```
+
 ```{r}
 # Extraction du texte du CV (remplacer par le chemin de votre fichier)
 texte_cv <- tolower(pdf_ocr_text("data/CV Yoann.pdf"))
@@ -124,21 +123,17 @@ offres_correspondantes <- job_data[job_data$CorrespondanceCV, ]
 
 ```
 
-
-
-
 ```{r}
 test <- read.csv("data/output_bdd.csv")
 ```
 
-
 ```{r}
 test <- fread("StockUniteLegaleHistorique_utf8.csv")
 ```
+
 ```{r}
 test[denominationUniteLegale == "BNP PARIBAS",.(dateDebut,siren,denominationUniteLegale,activitePrincipaleUniteLegale)]
 ```
-
 
 ```{r}
 test[denominationUniteLegale == "BNP PARIBAS",.(dateDebut)]
@@ -179,11 +174,10 @@ for (start_row in seq(1, total_rows, by = chunk_size)) {
 ```{r}
 df_2022[denominationUniteLegale == "SQUARE",.(dateDebut,siren,denominationUniteLegale,activitePrincipaleUniteLegale)]
 ```
+
 ```{r}
 write.csv2(df_2022,"siren2022.csv")
 ```
-
-
 
 ```{r}
 
@@ -192,7 +186,6 @@ write.csv2(df_2022,"siren2022.csv")
 ```{r}
 data[denominationUniteLegale == "HAGER",.(dateDebut,siren,denominationUniteLegale,activitePrincipaleUniteLegale)]
 ```
-
 
 ```{r}
 library(stringdist)
@@ -203,8 +196,6 @@ library(data.table)
 bdd <- fread("output_bdd.csv", header = T)
 data <- fread("siren2022.csv")
 ```
-
-
 
 ```{r}
 noms_incorrects <- bdd[,Entreprise]# Remplacez avec vos données
@@ -236,18 +227,15 @@ noms_corriges <- sapply(noms_incorrects, function(nom_incorrect) {
 bdd$EntrepriseCor <- noms_corriges
 ```
 
-
 ```{r}
 bdd[,.(Entreprise,EntrepriseCor)]
 ```
-
 
 ### Deal with full csv :
 
 ```{r}
 library(data.table)
 ```
-
 
 ```{r}
 data <- fread("data/full_data.csv")
@@ -258,12 +246,9 @@ indeed <- fread("data/indeed_data.csv")
 job_data <- fread("data/job_data.csv",header = T)
 ```
 
-
 ```{r}
 data
 ```
-
-
 
 ```{r}
 cat("Job Data colnames \n")
@@ -274,12 +259,18 @@ colnames(data)
 ```
 
 ```{r}
-data
+library(ggplot2)
+library(data.table)
+data <- read.csv2("data/data2.csv")
+setDT(data)
 ```
 
 
-
-
-
-
+```{r}
+ggplot(data, aes(x = as.factor(Département))) +
+  geom_bar(fill = "steelblue") +
+  theme_minimal() +
+  labs(x = "Département", y = "Nombre d'offres", title = "Répartition des Offres par Département") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
 

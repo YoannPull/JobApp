@@ -85,6 +85,12 @@ data[LieuExercice == "Sainte-Luce-sur-Loire, Paris", LieuExerciceCorr := nom_dep
 data[LieuExercice == "France", LieuExerciceCorr := nom_departement]
 data[LieuExercice == "Champagne-Ardenne - Nord -", LieuExerciceCorr := nom_departement]
 
+# vérification à la main
+data[LieuExercice == "Fin", LieuExerciceCorr := "Paris"] 
+data[LieuExercice == "Ales", LieuExerciceCorr := "Alès"]
+data[LieuExercice == "Macon", LieuExerciceCorr := "Macôn"]
+data[LieuExercice == "Torce", LieuExerciceCorr := "Torcé"]
+
 data[is.na(LieuExerciceCorr), LieuExerciceCorr := ""]
 
 data[is.na(Département), .(NA_Count = .N), by = .(LieuExercice)][,LieuExercice]
@@ -123,16 +129,53 @@ for (i in seq_along(data$LieuExerciceCorr)) {
 # }
 
 
-
 # Renomage des variables :
 
-job_data <- fread("data/job_data.csv", header = T)
+# job_data <- fread("data/job_data.csv", header = T)
 data$old_LieuExercice <- data$LieuExercice
 data$LieuExercice <- data$LieuExerciceCorr
 data[,LieuExerciceCorr :=NULL]
 colnames(data)[4] <- "DuréeEmploi"
 colnames(data)[15] <- "CompétencesDemandées"
 colnames(data)[14] <- "SecteurEntreprise"
+
+
+
+
+# Ajoute de variable pour les graphiques :
+
+extraire_comp <- function(competences_offre){
+  competences_offre <- tolower(competences_offre)
+  competences_offre_liste <- unlist(str_split(competences_offre, ",\\s*"))
+  return(competences_offre_liste)
+}
+
+library(ggplot2)
+
+# Préparer les données pour le pie chart des compétences
+# Séparer les compétences et compter leur fréquence
+data_compétences <- data[, .(Compétences = unlist(strsplit(Compétences, ",\\s*"))), by = .(ID)]
+data_compétences <- data_compétences[, .(Frequence = .N), by = .(Compétences)]
+setorder(data_compétences, -Frequence)
+top_compétences <- head(data_compétences, 5)
+
+# Préparer les données pour le bar plot des zones géographiques
+data_zones_geo <- data[!is.na(nom_departement), .(Offres = .N), by = .(nom_departement)]
+setorder(data_zones_geo, -Offres)
+top_zones_geo <- head(data_zones_geo, 10)
+
+ggplot(top_compétences, aes(x = "", y = Frequence, fill = Compétences)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar(theta = "y") +
+  labs(title = "Top 5 Compétences Demandées", fill = "Compétence") +
+  theme_void()
+
+
+ggplot(top_zones_geo, aes(x = reorder(nom_departement, Offres), y = Offres)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top 10 des Départements par Nombre d'Offres", x = "nom_departement", y = "Nombre d'offres") +
+  theme_minimal()
 
 
 write.csv2(data,"data/data3.csv")
