@@ -4,7 +4,7 @@ library(tmaptools)
 library(dplyr)
 library(httr)
 
-job_data <- read.csv2("../data/data2.csv",header = T)
+job_data <- read.csv2("../data/data2.csv")
 
 setDT(job_data)
 
@@ -22,7 +22,7 @@ function(input, output, session) {
     filters <- list(
       
       # Création des listes déroulantes pour filtrer
-      SecteurEntreprise = input$secteurInput,
+      SecteurActivité = input$secteurInput,
       IntituléPoste = input$posteInput,
       LieuExercice = input$lieuInput,
       FourchetteSalaire = input$salaireInput,
@@ -66,12 +66,12 @@ function(input, output, session) {
                        Entreprise, LieuExercice, TypeEmploi, DuréeEmploi,
                        SiteSourceAnnonce, LienAnnonce)]
   }, options = list(
-    pageLength = 10,  # Définit le nombre d'entrées par page
+    pageLength = 5,  # Définit le nombre d'entrées par page
     autoWidth = TRUE,  # Ajuste automatiquement la largeur des colonnes
     dom = 'ftpi',  # Configure les éléments de contrôle à afficher (longueur, filtrage, table, informations, pagination)
     language = list(
       search = '<i class="fa fa-search" aria-hidden="true"></i>',
-      searchPlaceholder = 'Cherchez un job de la data, une entreprise, une ville ou un mot clé'
+      searchPlaceholder = 'Cherchez un job de la data, une entreprise, une ville...'
     )
   ),
   selection = "single",
@@ -130,23 +130,23 @@ function(input, output, session) {
   counts_per_ville <- table(job_data$LieuExercice) # compte le nombre d'offre par ville
   
   output$mymap <- renderLeaflet({
-    leaflet(job_data) %>%
-      setView(lng = 2.2137, lat = 46.6031, zoom = 5) %>%  #on set la view sur la France
-      
-      addProviderTiles(providers$Stadia.StamenTonerLite,
-                       options = providerTileOptions(noWrap = TRUE) # carte de fond
-      ) %>%
-      addCircleMarkers(data = job_data,
-                       lng = ~lon,
-                       lat = ~lat,
-                       radius = 8,  # Rayon des cercles
-                       fillOpacity = 0.8,  # Opacité de remplissage
-                       color = "salmon",  # Couleur des cercles
-                       popup = ~paste0("<strong>", LieuExercice, "</strong>: ", counts_per_ville[LieuExercice], " offre(s)", "<br>",
-                                       "<a href=\"#\" onclick=\"Shiny.setInputValue('selectedCity', '", LieuExercice, "', {priority: 'event'});\">Voir les offres</a>"),  # Popup avec le nombre d'offres correspondantes
-                       group = "markers")  # Ajout d'un groupe pour une gestion plus facile
+        leaflet(job_data) %>%
+          setView(lng = 2.2137, lat = 46.6031, zoom = 5) %>%  # Vue centrée sur la France
+          
+          addProviderTiles(providers$Stadia.AlidadeSmooth,  # Changement du fond de carte pour un style plus esthétique
+                           options = providerTileOptions(noWrap = TRUE)) %>%
+          
+          addCircleMarkers(data = job_data,
+                           ~lon, ~lat,  # Coordonnées des cercles
+                           radius = 8,  # Rayon des cercles
+                           fillOpacity = 0.8,  # Opacité de remplissage
+                           color = "#D7BDE2",  # Couleur des cercles en violet très clair
+                           fillColor = "#D7BDE2",  # Couleur de remplissage des cercles
+                           popup = ~paste0("<strong>", LieuExercice, "</strong>: ", counts_per_ville[LieuExercice], " offre(s)", "<br>",
+                                           "<a href=\"#\" onclick=\"Shiny.setInputValue('selectedCity', '", LieuExercice, "', {priority: 'event'});\">Voir les offres</a>"),
+                           group = "markers")  
+      })
     
-  })
   
   observeEvent(input$selectedCity, {
     updateTabsetPanel(session, "tabs", selected = "Tableau des offres")
@@ -158,15 +158,14 @@ function(input, output, session) {
   
   
   verifier_competences <- function(competences_offre, competences_cv) {
-    competences_offre <- str_to_lower(competences_offre)
+    competences_offre <- tolower(competences_offre)
     competences_offre_liste <- unlist(str_split(competences_offre, ",\\s*"))
-    any(competences_offre_liste %in% competences_cv)
+    nb_correspondances <- sum(competences_offre_liste %in% competences_cv)
+    proportion_correspondances <- round(100 * nb_correspondances / length(competences_offre_liste),2)
+    return(proportion_correspondances) # Retourne la proportion de compétences qui matchent
   }
   
   offres_correspondantes <- reactiveVal()
-  
-  # Chargement du pdf et extraction de tous les mots unique pour match avec les
-  # compétences de la bdd
   
   observeEvent(input$btnAnalyse, {
     req(input$fileInput)
@@ -178,19 +177,31 @@ function(input, output, session) {
     # Extraction des compétences du CV
     competences_cv <- str_extract_all(texte_cv, "\\b([A-Za-z]+)\\b")[[1]]
     competences_cv <- unique(competences_cv)
-    job_data$CorrespondanceCV <- sapply(job_data$CompétencesDemandées,
-                                        function(x) verifier_competences(x, competences_cv))
-    offres_correspondantes(job_data[job_data$CorrespondanceCV, ])
     
-    # Affichage des résultats
+    # Calcul de la proportion de correspondance pour chaque offre
+    job_data$ProportionCompetencesCorrespondantes <- sapply(job_data$CompétencesDemandées,
+                                                            function(x) verifier_competences(x, competences_cv))
+    
+    # Filtrer pour garder seulement les offres avec au moins une compétence correspondante (proportion > 0)
+    job_data_filtré <- job_data[job_data$ProportionCompetencesCorrespondantes > 0, ]
+    
+    # Trier les offres par la proportion de compétences correspondantes en ordre décroissant
+    offres_triees <- job_data_filtré[order(-job_data_filtré$ProportionCompetencesCorrespondantes), ]
+    
+    offres_correspondantes(offres_triees)
+    
+    # Affichage des résultats avec la proportion de compétences qui matchent
     output$tableCorrespondances <- DT::renderDataTable({
-      offres_correspondantes()[, .(IntituléPoste, Entreprise,
-                                   LieuExercice, CompétencesDemandées)]
-    }, options = list(lengthChange = FALSE, pageLength = 10,
-                      autoWidth = TRUE, dom = 'tpi'),
+      offres_correspondantes()[, .(IntituléPoste,
+                                   Entreprise,
+                                   LieuExercice,
+                                   CompétencesDemandées,
+                                   "Proportion Competences Correspondantes" = paste0(ProportionCompetencesCorrespondantes,"%"))]
+    }, options = list(lengthChange = FALSE, pageLength = 10, autoWidth = TRUE, dom = 'tpi'),
     selection = "single")
   })
   
+
   
   # Permet de cliquer sur une ligne pour afficher plus de détail
   observeEvent(input$tableCorrespondances_rows_selected, {
