@@ -54,7 +54,7 @@ shinyUI(fluidPage(
     dashboardHeader(title = "STAGE SVP!"),
     dashboardSidebar(
       
-      sidebarMenu(
+      sidebarMenu(id = "tabs",
         
         # Autres éléments de l'UI
         tags$img(src = 'logo.png', style = 'display: block; margin-left: auto; margin-right: auto;', width = '186'),

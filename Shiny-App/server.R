@@ -149,7 +149,7 @@ function(input, output, session) {
     
   
   observeEvent(input$selectedCity, {
-    updateTabsetPanel(session, "tabs", selected = "Tableau des offres")
+    updateTabItems(session,inputId = "tabs", selected = "tableau")
     updateTextInput(session, "lieuInput", value = input$selectedCity)
   })
   
